@@ -9,3 +9,5 @@ notebooks/data/
 build/
 dist/
 archive/
+docs/_site/
+.quarto/
