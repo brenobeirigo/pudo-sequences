@@ -1,0 +1,73 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pudo-sequences"
+version = "0.1.0"
+description = "Generate, count, and index valid pickup/drop-off event sequences."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "Breno Beirigo" }
+]
+keywords = [
+    "pickup-and-delivery",
+    "pickup-dropoff",
+    "precedence-constraints",
+    "paired-events",
+    "combinatorics",
+    "topological-sorts",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = []
+
+[project.optional-dependencies]
+networkx = ["networkx>=3.0"]
+test = ["pytest>=8.0", "networkx>=3.0"]
+dev = ["build>=1.2", "twine>=5.0", "pytest>=8.0", "networkx>=3.0"]
+
+[project.urls]
+Homepage = "https://github.com/brenobeirigo/pudo-sequences"
+Repository = "https://github.com/brenobeirigo/pudo-sequences"
+Issues = "https://github.com/brenobeirigo/pudo-sequences/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pudo_sequences"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/LICENSE",
+    "/README.md",
+    "/pyproject.toml",
+    "/pudo_sequences",
+    "/tests",
+]
+exclude = [
+    "/archive",
+    "/notebooks",
+    "/.pytest_cache",
+    "/.ruff_cache",
+    "/.mypy_cache",
+    "/build",
+    "/dist",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
