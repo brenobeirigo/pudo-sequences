@@ -1,0 +1,146 @@
+---
+title: "Examples"
+---
+
+## All permutations vs valid sequences
+
+For two new requests, there are four events:
+
+```text
+0 = pickup request 0
+1 = pickup request 1
+2 = drop-off request 0
+3 = drop-off request 1
+```
+
+`itertools.permutations` treats those four labels as independent events, so it
+returns impossible routes such as `(2, 0, 1, 3)`, where request `0` is dropped
+off before it is picked up.
+
+```python
+from itertools import permutations
+
+from pudo_sequences import pudo_sequences
+
+all_orders = list(permutations([0, 1, 2, 3]))
+valid_orders = pudo_sequences([0, 1])
+
+print(len(all_orders))
+print(len(valid_orders))
+```
+
+```text
+24
+6
+```
+
+The valid event orders are:
+
+```python
+[
+    (0, 1, 2, 3),
+    (0, 1, 3, 2),
+    (0, 2, 1, 3),
+    (1, 0, 2, 3),
+    (1, 0, 3, 2),
+    (1, 3, 0, 2),
+]
+```
+
+## Checking candidate routes
+
+For small neighborhoods, a simple way to validate a candidate from a heuristic
+or policy is to compare it with the generated action set.
+
+```python
+from pudo_sequences import pudo_sequences
+
+valid_routes = set(pudo_sequences([0, 1, 2]))
+
+assert (0, 3, 1, 4, 2, 5) in valid_routes
+assert (3, 0, 1, 4, 2, 5) not in valid_routes
+```
+
+The first candidate is valid because every pickup appears before its paired
+drop-off. The second candidate is invalid because drop-off `3` appears before
+pickup `0`.
+
+## Already-open drop-offs
+
+Sometimes the planning horizon starts with passengers, parcels, or tasks that
+were already picked up. Their drop-offs do not have a pickup inside the local
+sequence, so they may appear anywhere.
+
+```python
+from pudo_sequences import count_pudo_sequences, pudo_sequences
+
+routes = pudo_sequences([0, 1], open_dropoffs=[4])
+
+assert len(routes) == count_pudo_sequences(2, n_open_dropoffs=1)
+assert len(routes) == 30
+assert (4, 0, 1, 2, 3) in routes
+assert (0, 1, 2, 3, 4) in routes
+```
+
+The two new requests still obey paired pickup/drop-off precedence, while the
+already-open drop-off `4` is unconstrained.
+
+## Custom labels
+
+Use `dropoff_for` when event labels are not the default integer convention.
+
+```python
+from pudo_sequences import pudo_sequences
+
+routes = pudo_sequences(
+    ["alice", "bob"],
+    dropoff_for=lambda pickup: ("dropoff", pickup),
+)
+
+assert (
+    "alice",
+    ("dropoff", "alice"),
+    "bob",
+    ("dropoff", "bob"),
+) in routes
+```
+
+Labels only need to be unique and hashable.
+
+## Streaming routes
+
+Use `iter_pudo_sequences` when the generated set is consumed once or when the
+score function may stop early.
+
+```python
+from pudo_sequences import iter_pudo_sequences
+
+best_route = None
+best_score = float("inf")
+
+for route in iter_pudo_sequences([0, 1, 2]):
+    score = sum(route)  # Replace with distance, time, reward, or feasibility logic.
+    if score < best_score:
+        best_route = route
+        best_score = score
+```
+
+The generator is intended for small local neighborhoods. Counts grow
+factorially, so larger request sets should usually be handled by heuristics,
+optimization models, or sampling.
+
+## Prefix continuations
+
+Build a prefix index when a caller repeatedly asks which valid suffixes remain
+after a partial route.
+
+```python
+from pudo_sequences import build_pudo_index
+
+index = build_pudo_index([0, 1])
+
+assert index.continuations([0, 1]) == {(2, 3), (3, 2)}
+assert index.continuations([0, 2]) == {(1, 3)}
+assert index.continuations([1, 3]) == {(0, 2)}
+assert index.continuations([3]) == set()
+```

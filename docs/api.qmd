@@ -1,0 +1,98 @@
+---
+title: "API"
+---
+
+The public API is intentionally small.
+
+## Generation
+
+### `pudo_sequences`
+
+Return valid pickup/drop-off event sequences as a list.
+
+```python
+from pudo_sequences import pudo_sequences
+
+routes = pudo_sequences([0, 1])
+```
+
+Use this when the complete local action set is small enough to materialize.
+
+### `iter_pudo_sequences`
+
+Yield valid pickup/drop-off event sequences lazily.
+
+```python
+from pudo_sequences import iter_pudo_sequences
+
+for route in iter_pudo_sequences([0, 1, 2]):
+    ...
+```
+
+Parameters shared by both generation functions:
+
+| Parameter | Meaning |
+| --- | --- |
+| `requests` | New request pickup labels. Labels must be unique and hashable. |
+| `open_dropoffs` | Drop-off labels for requests already open before this planning horizon. |
+| `dropoff_for` | Function mapping each pickup label to its paired drop-off label. |
+| `strategy` | `"dfs"`, `"insertion"`, or `"topological"`. |
+
+The default strategy is `"dfs"` and has no optional dependencies. The
+`"topological"` strategy requires NetworkX.
+
+## Counts
+
+For `n` labeled pickup/drop-off pairs, the count is:
+
+```text
+(2n)! / 2^n
+```
+
+With `m` already-open drop-offs, the count is:
+
+```text
+(2n + m)! / 2^n
+```
+
+```python
+from pudo_sequences import (
+    count_fixed_pickup_order_dropoff_insertions,
+    count_open_dropoff_insertions,
+    count_pudo_sequences,
+)
+
+assert count_pudo_sequences(3) == 90
+assert count_pudo_sequences(3, n_open_dropoffs=2) == 5040
+assert count_fixed_pickup_order_dropoff_insertions(3) == 15
+assert count_open_dropoff_insertions(3, 2) == 56
+```
+
+## Prefix index
+
+### `build_pudo_index`
+
+Build a prefix index over all complete PU/DO sequences.
+
+```python
+from pudo_sequences import build_pudo_index
+
+index = build_pudo_index([0, 1])
+assert index.continuations([0, 1]) == {(2, 3), (3, 2)}
+```
+
+### `PudoSequenceIndex`
+
+`PudoSequenceIndex` can also be built from precomputed sequences.
+
+```python
+from pudo_sequences import PudoSequenceIndex
+
+index = PudoSequenceIndex.from_sequences([(1, 2), (1, 3)])
+
+assert index.sequences() == {(1, 2), (1, 3)}
+assert index.continuations([1]) == {(2,), (3,)}
+```
+
+The index is useful when prefix continuation lookup is repeated many times.
+

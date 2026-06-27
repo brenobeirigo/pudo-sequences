@@ -1,0 +1,43 @@
+---
+title: "Development"
+---
+
+## Local setup
+
+```bash
+pip install -e ".[dev]"
+pytest -q
+```
+
+Build and check package artifacts:
+
+```bash
+python -m build --sdist --wheel
+python -m twine check dist/*
+```
+
+## Documentation
+
+The documentation source is a Quarto website in `docs/`.
+
+```bash
+quarto preview docs
+quarto render docs
+```
+
+Rendered files are written to `docs/_site/` and are not committed.
+
+Quarto is a good fit for this project because it can combine Markdown,
+scientific notation, Python examples, and API-oriented narrative in one
+documentation site.
+
+## Release checklist
+
+1. Update code and tests.
+2. Run `pytest -q`.
+3. Update the version in `pyproject.toml` and `pudo_sequences/__init__.py`.
+4. Rebuild with `python -m build --sdist --wheel`.
+5. Check artifacts with `python -m twine check dist/*`.
+6. Publish a GitHub release so the release workflow can publish to PyPI.
+
+PyPI releases are immutable, so every public upload needs a new version.

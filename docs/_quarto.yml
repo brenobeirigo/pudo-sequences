@@ -1,0 +1,36 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "pudo-sequences"
+  description: "Generate, count, and index valid pickup/drop-off event sequences."
+  site-url: "https://brenobeirigo.github.io/pudotrie/"
+  repo-url: "https://github.com/brenobeirigo/pudotrie"
+  repo-actions: [source, issue]
+  navbar:
+    left:
+      - href: index.qmd
+        text: Overview
+      - href: examples.qmd
+        text: Examples
+      - href: api.qmd
+        text: API
+      - href: development.qmd
+        text: Development
+    right:
+      - text: PyPI
+        href: https://pypi.org/project/pudo-sequences/
+      - icon: github
+        href: https://github.com/brenobeirigo/pudotrie
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    code-copy: true
+    code-overflow: wrap
+
+execute:
+  enabled: false
+

@@ -1,0 +1,68 @@
+---
+title: "pudo-sequences"
+subtitle: "Pickup/drop-off sequence combinatorics for local routing decisions."
+---
+
+`pudo-sequences` generates only the event orders that satisfy paired pickup and
+drop-off precedence constraints. It is useful when a routing, dispatching,
+simulation, optimization, or learning system needs a compact local action space
+before evaluating distance, time windows, capacity, cost, or reward.
+
+```text
+pickup_i before dropoff_i
+```
+
+The package does not solve a route. It gives the constrained sequence space that
+a solver, simulator, heuristic, or policy can evaluate.
+
+## Install
+
+```bash
+pip install pudo-sequences
+```
+
+The core package has no runtime dependency beyond Python. The optional
+topological-sort strategy uses NetworkX:
+
+```bash
+pip install "pudo-sequences[networkx]"
+```
+
+## Quick start
+
+With the default integer convention, pickup `i` maps to drop-off `i + n`, where
+`n` is the number of new requests.
+
+```python
+from pudo_sequences import count_pudo_sequences, pudo_sequences
+
+print(count_pudo_sequences(2))
+print(pudo_sequences([0, 1]))
+```
+
+```text
+6
+[(0, 1, 2, 3), (0, 1, 3, 2), (0, 2, 1, 3),
+ (1, 0, 2, 3), (1, 0, 3, 2), (1, 3, 0, 2)]
+```
+
+For `requests=[0, 1]`, events `0` and `1` are pickups, while events `2` and
+`3` are the paired drop-offs.
+
+## Why it matters
+
+Normal permutations include impossible orders. For two requests, there are
+`24` unconstrained permutations of four events, but only `6` valid PU/DO
+sequences.
+
+| Requests | Unconstrained permutations | Valid PU/DO sequences | Valid share |
+| ---: | ---: | ---: | ---: |
+| 1 | 2 | 1 | 50.0% |
+| 2 | 24 | 6 | 25.0% |
+| 3 | 720 | 90 | 12.5% |
+| 4 | 40,320 | 2,520 | 6.25% |
+| 5 | 3,628,800 | 113,400 | 3.125% |
+
+This gap is why it is usually better to generate the constrained local action
+set directly instead of generating impossible actions first and filtering later.
+
