@@ -4,7 +4,7 @@ project:
 
 website:
   title: "pudo-sequences"
-  description: "Generate, count, and index valid pickup/drop-off event sequences."
+  description: "Generate, count, and index valid pickup/drop-off event orders for small route insertion problems."
   site-url: "https://brenobeirigo.github.io/pudotrie/"
   repo-url: "https://github.com/brenobeirigo/pudotrie"
   repo-actions: [source, issue]
@@ -33,4 +33,3 @@ format:
 
 execute:
   enabled: false
-

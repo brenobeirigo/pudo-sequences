@@ -2,7 +2,7 @@
 title: "Development"
 ---
 
-## Local setup
+## Local Setup
 
 ```bash
 pip install -e ".[dev]"
@@ -27,17 +27,42 @@ quarto render docs
 
 Rendered files are written to `docs/_site/` and are not committed.
 
-Quarto is a good fit for this project because it can combine Markdown,
-scientific notation, Python examples, and API-oriented narrative in one
-documentation site.
+The docs are written as a student-focused practical explainer for PU/DO
+combinatorics. Prefer abstract integer examples for the main path. If custom
+labels are needed, use compact labels such as `1 -> "1'"` rather than
+domain-specific rider or vehicle names.
 
-## Release checklist
+Keep the package boundary clear:
+
+```text
+pudo-sequences: generate PU/DO-valid event orders
+application: check capacity, time windows, vehicle load, cost, energy, reward
+```
+
+Mermaid diagrams can be used directly in Quarto. Prefer vertical diagrams with
+short block labels so they render well in narrow documentation layouts.
+
+````markdown
+```{mermaid}
+flowchart TD
+    A["new PUDO<br/>requests"] --> B["PU/DO-valid<br/>orders"]
+    B --> C["capacity<br/>check"]
+    C --> D["score and<br/>select"]
+```
+````
+
+The API page contains one hidden executed Quarto profiling chunk. It is frozen
+with `freeze: auto` so benchmark output is reused until the page source changes.
+The chunk is intended for maintainer publishing, not for ordinary package users.
+
+## Release Checklist
 
 1. Update code and tests.
 2. Run `pytest -q`.
-3. Update the version in `pyproject.toml` and `pudo_sequences/__init__.py`.
-4. Rebuild with `python -m build --sdist --wheel`.
-5. Check artifacts with `python -m twine check dist/*`.
-6. Publish a GitHub release so the release workflow can publish to PyPI.
+3. Run `quarto render docs`.
+4. Update the version in `pyproject.toml` and `pudo_sequences/__init__.py`.
+5. Rebuild with `python -m build --sdist --wheel`.
+6. Check artifacts with `python -m twine check dist/*`.
+7. Publish a GitHub release so the release workflow can publish to PyPI.
 
 PyPI releases are immutable, so every public upload needs a new version.

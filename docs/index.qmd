@@ -1,19 +1,137 @@
 ---
 title: "pudo-sequences"
-subtitle: "Pickup/drop-off sequence combinatorics for local routing decisions."
+subtitle: "Generate valid PU/DO action spaces for small route insertion problems."
 ---
 
-`pudo-sequences` generates only the event orders that satisfy paired pickup and
-drop-off precedence constraints. It is useful when a routing, dispatching,
-simulation, optimization, or learning system needs a compact local action space
-before evaluating distance, time windows, capacity, cost, or reward.
+`pudo-sequences` teaches and implements one core idea:
+
+> Generate every pickup-before-dropoff-valid event order first. Then check the
+> other route-feasibility layers.
+
+In online route insertion, new pickup/drop-off requests appear while vehicles
+already have partial routes. For small local state spaces, it is often useful to
+enumerate every logical event order before testing DARP constraints such as
+capacity, customer time windows, vehicle load, travel cost, or energy cost.
 
 ```text
 pickup_i before dropoff_i
 ```
 
-The package does not solve a route. It gives the constrained sequence space that
-a solver, simulator, heuristic, or policy can evaluate.
+## The First Filter
+
+```{mermaid}
+flowchart TD
+    A["new PUDO<br/>requests"] --> B["generate<br/>PU/DO-valid<br/>orders"]
+    B --> C["check<br/>capacity"]
+    C --> D["check customer<br/>time windows"]
+    D --> E["check vehicle<br/>load"]
+    E --> F["score travel<br/>or energy"]
+    F --> G["choose route<br/>insertion"]
+```
+
+`pudo-sequences` handles the first filter: pickup/drop-off precedence. It does
+not decide capacity, time-window, load, travel, energy, or assignment
+feasibility. Those checks happen after the PU/DO-valid action space exists.
+
+## A Tiny Example
+
+For two new requests, there are four events:
+
+```text
+0 = pickup request 0
+1 = pickup request 1
+2 = drop-off request 0
+3 = drop-off request 1
+```
+
+Normal permutations include impossible orders such as `(2, 0, 1, 3)`, where
+request `0` is dropped off before pickup.
+
+```python
+from itertools import permutations
+
+from pudo_sequences import pudo_sequences
+
+all_orders = list(permutations([0, 1, 2, 3]))
+valid_orders = pudo_sequences([0, 1])
+
+print(len(all_orders))
+print(len(valid_orders))
+```
+
+```text
+24
+6
+```
+
+With the default integer convention, pickup `i` maps to drop-off `i + n`, where
+`n` is the number of new requests.
+
+## Request State
+
+```{mermaid}
+stateDiagram-v2
+    [*] --> Waiting
+    Waiting --> Onboard: pickup
+    Onboard --> Done: drop-off
+    Done --> [*]
+
+    state "already<br/>onboard" as Open
+    Open --> Done: open drop-off
+```
+
+New requests enter the local sequence as paired pickup/drop-off events.
+Already-open requests enter only as drop-offs because their pickups happened
+before the current planning horizon.
+
+## Why Not Plain Permutations?
+
+For four new requests, there are eight events:
+
+```text
+0 1 2 3 = pickups
+4 5 6 7 = paired drop-offs
+```
+
+Unrestricted permutations produce:
+
+```text
+8! = 40,320 event orders
+```
+
+PU/DO precedence keeps only:
+
+```text
+40,320 / 2^4 = 2,520 valid event orders
+```
+
+That is the package's purpose: generate the valid action space directly, instead
+of generating impossible permutations first and filtering afterward.
+
+## Generate and Reuse
+
+Materialize a small action set:
+
+```python
+from pudo_sequences import pudo_sequences
+
+routes = pudo_sequences([0, 1])
+
+assert (0, 1, 2, 3) in routes
+assert (2, 0, 1, 3) not in routes
+```
+
+Build an index when a search, policy, or teaching exercise repeatedly asks for
+valid continuations after a partial route:
+
+```python
+from pudo_sequences import build_pudo_index
+
+index = build_pudo_index([0, 1])
+
+assert index.continuations([0, 1]) == {(2, 3), (3, 2)}
+assert index.continuations([0, 2]) == {(1, 3)}
+```
 
 ## Install
 
@@ -28,41 +146,8 @@ topological-sort strategy uses NetworkX:
 pip install "pudo-sequences[networkx]"
 ```
 
-## Quick start
+## Next
 
-With the default integer convention, pickup `i` maps to drop-off `i + n`, where
-`n` is the number of new requests.
-
-```python
-from pudo_sequences import count_pudo_sequences, pudo_sequences
-
-print(count_pudo_sequences(2))
-print(pudo_sequences([0, 1]))
-```
-
-```text
-6
-[(0, 1, 2, 3), (0, 1, 3, 2), (0, 2, 1, 3),
- (1, 0, 2, 3), (1, 0, 3, 2), (1, 3, 0, 2)]
-```
-
-For `requests=[0, 1]`, events `0` and `1` are pickups, while events `2` and
-`3` are the paired drop-offs.
-
-## Why it matters
-
-Normal permutations include impossible orders. For two requests, there are
-`24` unconstrained permutations of four events, but only `6` valid PU/DO
-sequences.
-
-| Requests | Unconstrained permutations | Valid PU/DO sequences | Valid share |
-| ---: | ---: | ---: | ---: |
-| 1 | 2 | 1 | 50.0% |
-| 2 | 24 | 6 | 25.0% |
-| 3 | 720 | 90 | 12.5% |
-| 4 | 40,320 | 2,520 | 6.25% |
-| 5 | 3,628,800 | 113,400 | 3.125% |
-
-This gap is why it is usually better to generate the constrained local action
-set directly instead of generating impossible actions first and filtering later.
-
+Read the [examples](examples.qmd) for open drop-offs, custom labels, streaming,
+and prefix continuations. Use the [API](api.qmd) page for function details and
+strategy profiling.

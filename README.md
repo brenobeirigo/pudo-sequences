@@ -1,32 +1,49 @@
 # pudo-sequences
 
-`pudo-sequences` is a small Python package for PU/DO constrained sequence
-combinatorics: counting, generating, and indexing event orders where every
-pickup must occur before its paired drop-off.
+Generate valid PU/DO action spaces for small route insertion problems.
+
+`pudo-sequences` is a small Python package for pickup/drop-off sequence
+combinatorics. It counts, generates, streams, and indexes event orders where
+each pickup appears before its paired drop-off.
 
 ```text
 pickup_i before dropoff_i
 ```
 
-Use it when a routing, ridesharing, dispatching, simulation, optimization, or
-learning system needs to reason about feasible local service orders before
-evaluating distance, time windows, capacity, cost, or reward.
+Use it as the first feasibility layer in dispatching, routing, simulation,
+optimization, or learning code. For a small local insertion problem, generate
+all PU/DO-valid event orders first. Then your application can test the classic
+DARP layers: capacity, customer time windows, vehicle load, travel cost, energy
+cost, or reward.
 
 ## Why It Matters
 
-A PU/DO route is not just a permutation of events. For two new requests, the
-four events are:
+An event order is not just a permutation. With four new requests there are eight
+events:
 
 ```text
-0 = pickup request 0
-1 = pickup request 1
-2 = drop-off request 0
-3 = drop-off request 1
+0 1 2 3 = pickups
+4 5 6 7 = paired drop-offs
 ```
 
-`itertools.permutations` returns all `24` event orders, including impossible
-orders such as `(2, 0, 1, 3)`, where request `0` is dropped off before it is
-picked up.
+Normal permutations produce:
+
+```text
+8! = 40,320 event orders
+```
+
+Most of those orders are impossible because at least one drop-off appears before
+its pickup. PU/DO precedence leaves:
+
+```text
+40,320 / 2^4 = 2,520 valid event orders
+```
+
+That is the gap this package fills: it gives you the constrained action space
+directly instead of making you generate unrestricted permutations and filter
+them afterward.
+
+For a tiny two-request example:
 
 ```python
 from itertools import permutations
@@ -40,7 +57,7 @@ print(len(all_orders))
 print(len(valid_orders))
 ```
 
-```python
+```text
 24
 6
 ```
@@ -58,40 +75,8 @@ The valid orders are:
 ]
 ```
 
-You can filter normal permutations yourself:
-
-```python
-def is_valid(route):
-    return route.index(0) < route.index(2) and route.index(1) < route.index(3)
-
-
-filtered = [route for route in all_orders if is_valid(route)]
-
-assert filtered == valid_orders
-```
-
-For small teaching examples that is fine. In real local-search or learning
-loops, generating impossible actions first adds noise and waste. The gap grows
-quickly:
-
-| Requests | Unconstrained permutations | Valid PU/DO sequences | Valid share |
-| ---: | ---: | ---: | ---: |
-| 1 | 2 | 1 | 50.0% |
-| 2 | 24 | 6 | 25.0% |
-| 3 | 720 | 90 | 12.5% |
-| 4 | 40,320 | 2,520 | 6.25% |
-| 5 | 3,628,800 | 113,400 | 3.125% |
-
-The package focuses on this first layer:
-
-```text
-PU/DO combinatorics: which event orders are logically possible?
-Domain evaluation: which of those orders satisfy time, capacity, or cost rules?
-Selection: which feasible order should the system choose?
-```
-
-It is not a routing solver. It gives you the constrained local sequence space
-that a solver, simulator, heuristic, or policy can evaluate.
+With the default integer convention, pickup `i` maps to drop-off `i + n`, where
+`n` is the number of new requests.
 
 ## Install
 
@@ -115,18 +100,18 @@ pip install "pudo-sequences[networkx]"
 
 ## Quick Start
 
+Materialize the complete action set when it is small:
+
 ```python
 from pudo_sequences import count_pudo_sequences, pudo_sequences
 
-print(count_pudo_sequences(2))
-print(pudo_sequences([0, 1]))
+routes = pudo_sequences([0, 1])
+
+assert count_pudo_sequences(2) == 6
+assert routes[0] == (0, 1, 2, 3)
 ```
 
-With the default integer convention, pickup `i` maps to drop-off `i + n`, where
-`n` is the number of requests. For `requests=[0, 1]`, drop-offs are `2` and
-`3`.
-
-To stream instead of materializing every route:
+Stream routes when you want to score candidates one at a time:
 
 ```python
 from pudo_sequences import iter_pudo_sequences
@@ -135,52 +120,17 @@ best_route = None
 best_score = float("inf")
 
 for route in iter_pudo_sequences([0, 1, 2]):
-    score = sum(route)  # Replace with distance, time, reward, or feasibility logic.
+    score = sum(route)  # Replace with capacity, time-window, or cost logic.
     if score < best_score:
         best_route = route
         best_score = score
 ```
 
-To check whether a candidate from a heuristic is PU/DO-valid, compare it with
-the generated local action set for small neighborhoods:
+## Open Drop-Offs
 
-```python
-from pudo_sequences import pudo_sequences
-
-valid_routes = set(pudo_sequences([0, 1, 2]))
-
-assert (0, 3, 1, 4, 2, 5) in valid_routes
-assert (3, 0, 1, 4, 2, 5) not in valid_routes
-```
-
-## Custom Labels
-
-Use `dropoff_for` when events are not integers:
-
-```python
-from pudo_sequences import pudo_sequences
-
-routes = pudo_sequences(
-    ["alice", "bob"],
-    dropoff_for=lambda pickup: ("dropoff", pickup),
-)
-
-assert (
-    "alice",
-    ("dropoff", "alice"),
-    "bob",
-    ("dropoff", "bob"),
-) in routes
-```
-
-By requiring a mapping from pickup labels to drop-off labels, the package can
-use the same combinatorics for rider IDs, job IDs, task names, tuples, or other
-hashable labels.
-
-## Already-Open Drop-Offs
-
-Sometimes a planning horizon starts with requests already onboard. Their
-drop-offs have no pickup inside the local sequence, so they may appear anywhere.
+Some local plans start with passengers, parcels, or tasks already onboard.
+Their pickups happened before the current sequence, so only their drop-offs
+appear. These already-open drop-offs may be inserted anywhere.
 
 ```python
 from pudo_sequences import count_pudo_sequences, pudo_sequences
@@ -193,8 +143,22 @@ assert (4, 0, 1, 2, 3) in routes
 assert (0, 1, 2, 3, 4) in routes
 ```
 
-This represents two new requests plus one already-open request whose drop-off
-is `4`.
+## Custom Labels
+
+Use `dropoff_for` when labels are not the default integer convention.
+
+```python
+from pudo_sequences import pudo_sequences
+
+routes = pudo_sequences(
+    [1, 2],
+    dropoff_for=lambda pickup: f"{pickup}'",
+)
+
+assert (1, "1'", 2, "2'") in routes
+```
+
+The labels only need to be unique and hashable.
 
 ## Counts
 
@@ -204,16 +168,18 @@ For `n` labeled pickup/drop-off pairs, the number of valid sequences is:
 (2n)! / 2^n
 ```
 
-Equivalently:
-
-```text
-n! * (1 * 3 * 5 * ... * (2n - 1))
-```
-
-If there are also `m` already-open drop-offs, the count becomes:
+With `m` already-open drop-offs:
 
 ```text
 (2n + m)! / 2^n
+```
+
+The constructive view is:
+
+```text
+1. choose a pickup order;
+2. insert each paired drop-off only after its pickup;
+3. optionally insert already-open drop-offs anywhere.
 ```
 
 API:
@@ -231,51 +197,10 @@ assert count_fixed_pickup_order_dropoff_insertions(3) == 15
 assert count_open_dropoff_insertions(3, 2) == 56
 ```
 
-The constructive count is useful for explaining the structure:
-
-```text
-1. choose a pickup order;
-2. insert each paired drop-off only after its pickup;
-3. optionally insert already-open drop-offs anywhere.
-```
-
-## Generation Strategies
-
-The default strategy is dependency-free DFS over the PU/DO state space:
-
-```python
-from pudo_sequences import iter_pudo_sequences
-
-for route in iter_pudo_sequences([0, 1, 2], strategy="dfs"):
-    pass
-```
-
-Other strategies are available for comparison:
-
-- `strategy="insertion"`: generate pickup orders, then insert each paired
-  drop-off only after its pickup.
-- `strategy="topological"`: use NetworkX to enumerate all topological orders of
-  a precedence graph with edges `pickup_i -> dropoff_i`.
-
-For `n=3`, all strategies represent the same constrained sequence set:
-
-```python
-from pudo_sequences import pudo_sequences
-
-dfs_routes = set(pudo_sequences([0, 1, 2], strategy="dfs"))
-insertion_routes = set(pudo_sequences([0, 1, 2], strategy="insertion"))
-
-assert dfs_routes == insertion_routes
-```
-
-The generator is intended for small local neighborhoods. PU/DO sequence counts
-grow factorially, so large request sets should usually be handled by heuristics,
-optimization models, or sampling rather than full enumeration.
-
 ## Prefix Indexing
 
 When a caller repeatedly asks for valid continuations after a partial route,
-build a prefix index:
+build a prefix index once and reuse it.
 
 ```python
 from pudo_sequences import build_pudo_index
@@ -286,8 +211,34 @@ assert index.continuations([0, 1]) == {(2, 3), (3, 2)}
 assert index.continuations([0, 2]) == {(1, 3)}
 ```
 
-The index is a secondary feature. Its purpose is fast continuation lookup, not
-the definition of the package.
+For example, after prefix `[0, 2]`, request `0` has been picked up and dropped
+off. The only remaining valid suffix is pickup `1` followed by drop-off `3`.
+
+## Generation Strategies
+
+The default strategy is dependency-free DFS over the PU/DO state space.
+
+Other strategies are available for teaching and comparison:
+
+- `strategy="insertion"`: generate pickup orders, then insert each paired
+  drop-off only after its pickup.
+- `strategy="topological"`: use NetworkX to enumerate all topological orders of
+  a precedence graph with edges `pickup_i -> dropoff_i`.
+
+All strategies represent the same constrained sequence set.
+
+```python
+from pudo_sequences import pudo_sequences
+
+dfs_routes = set(pudo_sequences([0, 1, 2], strategy="dfs"))
+insertion_routes = set(pudo_sequences([0, 1, 2], strategy="insertion"))
+
+assert dfs_routes == insertion_routes
+```
+
+Full enumeration grows factorially. This package is intended for small local
+neighborhoods, exact validation, teaching, and candidate insertion sets inside a
+larger dispatch, optimization, or learning system.
 
 ## Development
 
